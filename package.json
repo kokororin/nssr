@@ -4,7 +4,13 @@
   "description": "",
   "bin": {
     "nssr": "bin/nssr",
-    "nssr-init": "bin/nssr-init"
+    "nssr-add": "bin/nssr-add",
+    "nssr-delete": "bin/nssr-delete",
+    "nssr-init": "bin/nssr-init",
+    "nssr-list": "bin/nssr-list",
+    "nssr-start": "bin/nssr-start",
+    "nssr-status": "bin/nssr-status",
+    "nssr-stop": "bin/nssr-stop"
   },
   "scripts": {
     "start": "npm run watch",
@@ -17,9 +23,7 @@
     "type": "git",
     "url": "git+https://github.com/kokororin/nssr.git"
   },
-  "keywords": [
-    "shadowsocksr"
-  ],
+  "keywords": ["shadowsocksr"],
   "author": "kokororin",
   "license": "MIT",
   "bugs": {
@@ -49,8 +53,5 @@
     "trash-cli": "^1.4.0",
     "typescript": "^2.5.3"
   },
-  "files": [
-    "lib",
-    "bin"
-  ]
+  "files": ["lib", "bin"]
 }

@@ -3,21 +3,19 @@ import * as pkg from 'pjson';
 import * as path from 'path';
 import * as cp from 'child_process';
 import * as fs from 'fs-extra';
-import * as util from 'util';
 import * as inquirer from 'inquirer';
-import chalk from 'chalk';
 import * as ora from 'ora';
 import * as glob from 'glob';
 import * as download from 'download-git-repo';
-import * as PrettyError from 'pretty-error';
 import Config from './Config';
 import Validator from './Validator';
+import Logger from './Logger';
 
 export = class Cli {
-  private prettyError: PrettyError;
+  private logger: Logger;
 
   public constructor() {
-    this.prettyError = new PrettyError();
+    this.logger = new Logger();
   }
 
   public register(): void {
@@ -28,7 +26,8 @@ export = class Cli {
       .command('delete [server]', 'delete a server')
       .command('list', 'list servers')
       .command('start [server]', 'start server')
-      .command('stop [server]', 'stop server')
+      .command('stop', 'stop server')
+      .command('status', 'server status')
       .parse(process.argv);
   }
 
@@ -53,9 +52,9 @@ export = class Cli {
         (err: any) => {
           spinner.stop();
           if (err) {
-            this.logError(err);
+            this.logger.error(err);
           } else {
-            this.logInfo(`initialized to ${Config.baseDir}`);
+            this.logger.info(`initialized to ${Config.baseDir}`);
           }
         }
       );
@@ -187,40 +186,106 @@ export = class Cli {
     delete answers.server_name;
     try {
       fs.writeFileSync(serverConfigPath, JSON.stringify(answers, null, 4));
-      this.logInfo(`create server to ${serverConfigPath}`);
+      this.logger.info(`create server to ${serverConfigPath}`);
     } catch (e) {
-      this.logError(e);
+      this.logger.error(e);
     }
   }
 
-  public async start(): Promise<any> {
+  public delete(): void {
     if (!this.checkInit()) {
       return;
     }
 
-    program.parse(process.argv);
+    const argv = process.argv.splice(2);
 
-    if (program.argv.length === 0) {
-      try {
-        const answers = await this.listServers();
-
-        cp.execSync(this.buildCmd(answers.server, 'start'));
-      } catch (e) {}
+    if (argv.length === 0) {
+      this.logger.warning('server name muse be provided');
     } else {
-      cp.execSync(this.buildCmd(process.argv[0], 'start'));
+      const configFile = path.join(Config.serverDir, `${argv[0]}.json`);
+      if (!fs.existsSync(configFile)) {
+        this.logger.warning(`server "${argv[0]}" not exist`);
+      } else {
+        fs.unlinkSync(configFile);
+        this.logger.info(`"${argv[0]}" has been deleted`);
+      }
     }
   }
 
-  public async stop(): Promise<any> {
+  public start(): void {
     if (!this.checkInit()) {
       return;
     }
 
-    try {
-      const answers = await this.listServers();
+    this.stop();
 
-      cp.execSync(this.buildCmd(answers.server, 'stop'));
-    } catch (e) {}
+    const argv = process.argv.splice(2);
+
+    if (argv.length === 0) {
+      this.logger.warning('server name muse be provided');
+    } else {
+      const configFile = path.join(Config.serverDir, `${argv[0]}.json`);
+      if (!fs.existsSync(configFile)) {
+        this.logger.warning(`server "${argv[0]}" not exist`);
+      } else {
+        try {
+          cp.execSync(
+            `${path.join(Config.libDir, 'shadowsocks', 'local.py')} -c ${
+              configFile
+            } --pid-file ${Config.pidFile} --log-file ${
+              Config.logFile
+            } -d start`
+          );
+        } catch (e) {
+          this.logger.error(e);
+        }
+      }
+    }
+  }
+
+  public stop(): void {
+    if (!this.checkInit()) {
+      return;
+    }
+
+    if (fs.existsSync(Config.pidFile)) {
+      process.kill(Number(fs.readFileSync(Config.pidFile)));
+      fs.unlinkSync(Config.pidFile);
+    }
+  }
+
+  public status(): void {
+    let isRunning: boolean;
+    let pid: number = 0;
+    if (fs.existsSync(Config.pidFile)) {
+      pid = Number(fs.readFileSync(Config.pidFile));
+      try {
+        isRunning = !!process.kill(pid, 0);
+      } catch (e) {
+        isRunning = e.code === 'EPERM';
+      }
+    } else {
+      isRunning = false;
+    }
+    if (isRunning && pid !== 0) {
+      this.logger.info(`nssr found running with process: ${pid}`);
+    } else {
+      this.logger.info('nssr is not running');
+    }
+  }
+
+  public list(): void {
+    if (!this.checkInit()) {
+      return;
+    }
+
+    glob(path.join(Config.serverDir, '*.json'), (err, files: Array<string>) => {
+      if (err) {
+      }
+      files.forEach(file => {
+        this.logger.info(path.basename(file, '.json'));
+      });
+    });
   }
 
   private hasInit(): boolean {
@@ -235,60 +300,10 @@ export = class Cli {
 
   private checkInit(): boolean {
     if (!this.hasInit()) {
-      this.logWarning('please initialize before use');
+      this.logger.warning('please initialize before use');
       return false;
     }
 
     return true;
-  }
-
-  private listServers(): Promise<any> {
-    return new Promise((resolve, reject) => {
-      glob(
-        path.join(Config.serverDir, '*.json'),
-        async (err, files: Array<string>) => {
-          if (err) {
-            return reject(err);
-          }
-          if (files.length === 0) {
-            this.logWarning('no config found');
-          } else {
-            const answers = await inquirer.prompt({
-              type: 'list',
-              name: 'server',
-              message: 'Choose server:',
-              choices: files.map(file => {
-                return {
-                  name: path.basename(file, '.json'),
-                  value: file
-                };
-              })
-            });
-            resolve(answers);
-          }
-        }
-      );
-    });
-  }
-
-  private buildCmd(server: string, daemon: string): string {
-    return `${path.join(Config.libDir, 'shadowsocks', 'local.py')} -c ${
-      server
-    } --pid-file ${Config.pidFile} --log-file ${Config.logFile} -d ${daemon}`;
-  }
-
-  private logInfo(...args: Array<any>): void {
-    const msg = util.format.apply(util.format, args);
-    console.log(chalk.white(`  ${msg}`));
-  }
-
-  private logWarning(...args: Array<any>): void {
-    const msg = util.format.apply(util.format, args);
-    console.log(chalk.yellow(`  ${msg}`));
-  }
-
-  private logError(err: Error): void {
-    console.log(this.prettyError.render(err));
-    process.exit(1);
   }
 };
