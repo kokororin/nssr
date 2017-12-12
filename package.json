@@ -1,7 +1,7 @@
 {
   "name": "nssr",
   "version": "0.1.1",
-  "description": "",
+  "description": "Node.js client for ShadowsocksR",
   "bin": {
     "nssr": "bin/nssr",
     "nssr-add": "bin/nssr-add",
