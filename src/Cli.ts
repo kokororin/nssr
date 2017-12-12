@@ -236,6 +236,10 @@ export = class Cli {
               Config.logFile
             } -d start`
           );
+          const pid: number = this.getPid();
+          if (pid > 0) {
+            this.logger.info(`start nssr at process: ${pid}`);
+          }
         } catch (e) {
           this.logger.error(e);
         }
@@ -248,17 +252,21 @@ export = class Cli {
       return;
     }
 
-    if (fs.existsSync(Config.pidFile)) {
-      process.kill(Number(fs.readFileSync(Config.pidFile)));
+    const pid: number = this.getPid();
+
+    if (pid > 0) {
+      try {
+        process.kill(pid);
+        this.logger.info(`kill nssr at process: ${pid}`);
+      } catch (e) {}
       fs.unlinkSync(Config.pidFile);
     }
   }
 
   public status(): void {
     let isRunning: boolean;
-    let pid: number = 0;
-    if (fs.existsSync(Config.pidFile)) {
-      pid = Number(fs.readFileSync(Config.pidFile));
+    let pid: number = this.getPid();
+    if (pid > 0) {
       try {
         isRunning = !!process.kill(pid, 0);
       } catch (e) {
@@ -267,7 +275,7 @@ export = class Cli {
     } else {
       isRunning = false;
     }
-    if (isRunning && pid !== 0) {
+    if (isRunning && pid > 0) {
       this.logger.info(`nssr found running with process: ${pid}`);
     } else {
       this.logger.info('nssr is not running');
@@ -299,11 +307,21 @@ export = class Cli {
   }
 
   private checkInit(): boolean {
+    if (process.argv.indexOf('--help') > -1) {
+      return false;
+    }
     if (!this.hasInit()) {
       this.logger.warning('please initialize before use');
       return false;
     }
 
     return true;
+  }
+
+  private getPid(): number {
+    if (fs.existsSync(Config.pidFile)) {
+      return Number(fs.readFileSync(Config.pidFile));
+    }
+    return 0;
   }
 };
