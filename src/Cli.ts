@@ -32,6 +32,10 @@ export = class Cli {
   }
 
   public async init(): Promise<any> {
+    if (!this.checkInit(false)) {
+      return;
+    }
+
     const answers = await inquirer.prompt({
       type: 'confirm',
       name: 'initialize',
@@ -197,17 +201,15 @@ export = class Cli {
       return;
     }
 
-    const argv = process.argv.splice(2);
-
-    if (argv.length === 0) {
+    if (program.args.length === 0) {
       this.logger.warning('server name muse be provided');
     } else {
-      const configFile = path.join(Config.serverDir, `${argv[0]}.json`);
+      const configFile = path.join(Config.serverDir, `${program.args[0]}.json`);
       if (!fs.existsSync(configFile)) {
-        this.logger.warning(`server "${argv[0]}" not exist`);
+        this.logger.warning(`server "${program.args[0]}" not exist`);
       } else {
         fs.unlinkSync(configFile);
-        this.logger.info(`"${argv[0]}" has been deleted`);
+        this.logger.info(`"${program.args[0]}" has been deleted`);
       }
     }
   }
@@ -219,14 +221,12 @@ export = class Cli {
 
     this.stop();
 
-    const argv = process.argv.splice(2);
-
-    if (argv.length === 0) {
+    if (program.args.length === 0) {
       this.logger.warning('server name muse be provided');
     } else {
-      const configFile = path.join(Config.serverDir, `${argv[0]}.json`);
+      const configFile = path.join(Config.serverDir, `${program.args[0]}.json`);
       if (!fs.existsSync(configFile)) {
-        this.logger.warning(`server "${argv[0]}" not exist`);
+        this.logger.warning(`server "${program.args[0]}" not exist`);
       } else {
         try {
           cp.execSync(
@@ -264,6 +264,10 @@ export = class Cli {
   }
 
   public status(): void {
+    if (!this.checkInit()) {
+      return;
+    }
+
     let isRunning: boolean;
     let pid: number = this.getPid();
     if (pid > 0) {
@@ -306,10 +310,13 @@ export = class Cli {
     return true;
   }
 
-  private checkInit(): boolean {
-    if (process.argv.indexOf('--help') > -1) {
-      return false;
+  private checkInit(check: boolean = true): boolean {
+    program.version(pkg.version).parse(process.argv);
+
+    if (!check) {
+      return true;
     }
+
     if (!this.hasInit()) {
       this.logger.warning('please initialize before use');
       return false;
