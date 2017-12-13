@@ -7,6 +7,7 @@ export default class Logger {
 
   public constructor() {
     this.prettyError = new PrettyError();
+    this.prettyError.start();
   }
 
   public info(...args: Array<any>): void {
@@ -17,10 +18,5 @@ export default class Logger {
   public warning(...args: Array<any>): void {
     const msg = util.format.apply(util.format, args);
     console.log(chalk.yellow(`  ${msg}`));
-  }
-
-  public error(err: Error): void {
-    console.log(this.prettyError.render(err));
-    process.exit(1);
   }
 }

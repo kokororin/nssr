@@ -60,7 +60,7 @@ export = class Cli {
         (err: any) => {
           spinner.stop();
           if (err) {
-            this.logger.error(err);
+            throw err;
           } else {
             this.logger.info(`initialized to ${Config.baseDir}`);
           }
@@ -192,12 +192,9 @@ export = class Cli {
       `${answers.server_name}.json`
     );
     delete answers.server_name;
-    try {
-      fs.writeFileSync(serverConfigPath, JSON.stringify(answers, null, 4));
-      this.logger.info(`create server to ${serverConfigPath}`);
-    } catch (e) {
-      this.logger.error(e);
-    }
+
+    fs.writeFileSync(serverConfigPath, JSON.stringify(answers, null, 4));
+    this.logger.info(`create server to ${serverConfigPath}`);
   }
 
   public delete(): void {
@@ -232,22 +229,18 @@ export = class Cli {
       if (!fs.existsSync(configFile)) {
         this.logger.warning(`server "${program.args[0]}" not exist`);
       } else {
-        try {
-          cp.execSync(
-            `${path.join(
-              Config.libDir,
-              'shadowsocks',
-              'local.py'
-            )} -c ${configFile} --pid-file ${Config.pidFile} --log-file ${
-              Config.logFile
-            } -d start`
-          );
-          const pid: number = this.getPid();
-          if (pid > 0) {
-            this.logger.info(`start nssr at process: ${pid}`);
-          }
-        } catch (e) {
-          this.logger.error(e);
+        cp.execSync(
+          `${path.join(
+            Config.libDir,
+            'shadowsocks',
+            'local.py'
+          )} -c ${configFile} --pid-file ${Config.pidFile} --log-file ${
+            Config.logFile
+          } -d start`
+        );
+        const pid: number = this.getPid();
+        if (pid > 0) {
+          this.logger.info(`start nssr at process: ${pid}`);
         }
       }
     }
