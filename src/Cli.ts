@@ -292,6 +292,7 @@ export = class Cli {
 
     glob(path.join(Config.serverDir, '*.json'), (err, files: Array<string>) => {
       if (err) {
+        throw err;
       }
       files.forEach(file => {
         this.logger.info(path.basename(file, '.json'));
