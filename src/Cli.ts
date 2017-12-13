@@ -7,15 +7,19 @@ import * as inquirer from 'inquirer';
 import * as ora from 'ora';
 import * as glob from 'glob';
 import * as download from 'download-git-repo';
+import * as semver from 'semver';
+import honoka from 'honoka';
 import Config from './Config';
 import Validator from './Validator';
 import Logger from './Logger';
 
 export = class Cli {
   private logger: Logger;
+  private config: Config;
 
   public constructor() {
     this.logger = new Logger();
+    this.config = new Config();
   }
 
   public register(): void {
@@ -230,9 +234,11 @@ export = class Cli {
       } else {
         try {
           cp.execSync(
-            `${path.join(Config.libDir, 'shadowsocks', 'local.py')} -c ${
-              configFile
-            } --pid-file ${Config.pidFile} --log-file ${
+            `${path.join(
+              Config.libDir,
+              'shadowsocks',
+              'local.py'
+            )} -c ${configFile} --pid-file ${Config.pidFile} --log-file ${
               Config.logFile
             } -d start`
           );
@@ -312,6 +318,7 @@ export = class Cli {
 
   private checkInit(check: boolean = true): boolean {
     program.version(pkg.version).parse(process.argv);
+    this.checkUpdate().catch(() => {});
 
     if (!check) {
       return true;
@@ -330,5 +337,31 @@ export = class Cli {
       return Number(fs.readFileSync(Config.pidFile));
     }
     return 0;
+  }
+
+  private async checkUpdate(): Promise<any> {
+    const lastUpdateCheck: number =
+      Number(this.config.get('lastUpdateCheck')) || 0;
+    if (lastUpdateCheck && Date.now() - lastUpdateCheck < 1000 * 60 * 60 * 24) {
+      return;
+    }
+
+    let latestPkg: any = await honoka.get(Config.packageURL);
+    latestPkg = JSON.parse(latestPkg);
+    const latestVersion = latestPkg.version;
+    const currentVersion = pkg.version;
+    if (!semver.valid(latestVersion)) {
+      return;
+    }
+
+    this.config.set('lastUpdateCheck', Date.now());
+
+    if (semver.gt(latestVersion, currentVersion)) {
+      this.logger.info();
+      this.logger.warning(
+        `Your current version of nssr is out of date. The latest version is ${latestVersion} while you're on ${currentVersion}.`
+      );
+      this.logger.info();
+    }
   }
 };
