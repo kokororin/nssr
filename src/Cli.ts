@@ -49,8 +49,8 @@ export = class Cli {
 
     if (answers.initialize) {
       fs.removeSync(Config.baseDir);
-      fs.mkdir(Config.baseDir);
-      fs.mkdir(Config.serverDir);
+      fs.mkdirpSync(Config.baseDir);
+      fs.mkdirpSync(Config.serverDir);
       const spinner = ora(`downloading library to ${Config.libDir}`);
       spinner.start();
       download(
